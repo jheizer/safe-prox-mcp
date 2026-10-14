@@ -6,6 +6,8 @@ An MCP (Model Context Protocol) server over HTTP that exposes Proxmox VE state t
 MCP clients. 21 of the 23 tools are pure reads. The only tools that modify anything are
 `create_vm_snapshot` and `create_container_snapshot`.
 
+![Screenshot of AI taking snapshot](assets/snapshot.png)
+
 ## Requirements
 
 - Docker
