@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.git/
+.vscode/
+.env
+clusters.json
+tests/
+*.md
+docker-compose.yml
+.github/

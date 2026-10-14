@@ -1,0 +1,13 @@
+services:
+  safe-prox-mcp:
+    image: ghcr.io/jheizer/safe-prox-mcp:latest
+    # `latest` tracks the newest release tag; pin it (e.g. :1.0.0) to hold a version.
+    pull_policy: always
+    container_name: safe-prox-mcp
+    restart: unless-stopped
+    volumes:
+      - ./clusters.json:/app/clusters.json:ro
+    environment:
+      - MCP_SERVER_API_KEY=ChangeThisToYourSecureSecretKey
+    ports:
+      - "8080:8080"

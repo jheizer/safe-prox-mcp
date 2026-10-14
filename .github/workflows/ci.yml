@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build src/SafeProxMcp/SafeProxMcp.csproj -c Release
+
+      # Live integration tests read clusters.json; it is absent here, so they no-op.
+      - name: Test
+        run: dotnet test tests/SafeProxMcp.Tests/SafeProxMcp.Tests.csproj -c Release
+
+  docker-build:
+    name: Build image (no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: safe-prox-mcp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          cat > clusters.json <<'JSON'
+          [{"id":"ci","url":"https://pve.invalid:8006","token":"mcp@pve!read=00000000-0000-0000-0000-000000000000"}]
+          JSON
+          docker run --rm -d --name smoke \
+            -e MCP_SERVER_API_KEY=smoke-key \
+            -v "$PWD/clusters.json:/app/clusters.json:ro" \
+            -p 8080:8080 \
+            safe-prox-mcp:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/health; then break; fi
+            sleep 2
+          done
+          docker logs smoke
+          curl -fsS http://127.0.0.1:8080/health | grep -q '"clusterCount":1'
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -d '{}' http://127.0.0.1:8080/mcp)
+          test "$code" = 401 || { echo "expected 401 from /mcp without a key, got $code"; exit 1; }
+          docker stop smoke

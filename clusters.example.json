@@ -1,0 +1,12 @@
+[
+  {
+    "id": "home",
+    "url": "https://pve.example.com:8006",
+    "token": "user@realm!tokenname=00000000-0000-0000-0000-000000000000"
+  },
+  {
+    "id": "office",
+    "url": "https://pve-office.example.com:8006/api2/json",
+    "token": "mcp@pve!read=11111111-1111-1111-1111-111111111111"
+  }
+]
