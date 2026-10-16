@@ -504,6 +504,65 @@ public class ProxmoxReadToolsTests
         result.GetProperty("task").GetString().Should().StartWith("UPID:");
     }
 
+    // -- Backups ----------------------------------------------------------
+
+    [Fact]
+    public async Task CreateBackupAsync_ReturnsUpidTask()
+    {
+        _client.Setup(c => c.CreateBackupAsync("pve1", 100, "nas", "snapshot", "zstd", "pre upgrade",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProxmoxBackupOperationResponse("UPID:pve1:1234:vzdump:100:root@pam:"));
+
+        var result = Json(await _tools.CreateBackupAsync("home", "pve1", 100, "nas", "snapshot", "zstd",
+            "pre upgrade"));
+
+        result.GetProperty("task").GetString().Should().StartWith("UPID:");
+    }
+
+    [Fact]
+    public async Task CreateBackupAsync_RejectsBlankStorage()
+    {
+        var act = () => _tools.CreateBackupAsync("home", "pve1", 100, "  ");
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("storage is required*");
+        _client.Verify(c => c.CreateBackupAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateBackupAsync_RejectsUnknownMode()
+    {
+        var act = () => _tools.CreateBackupAsync("home", "pve1", 100, "nas", "teleport");
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("mode must be one of*");
+        _client.Verify(c => c.CreateBackupAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateBackupAsync_RejectsUnknownCompression()
+    {
+        var act = () => _tools.CreateBackupAsync("home", "pve1", 100, "nas", "snapshot", "zip");
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("compress must be one of*");
+        _client.Verify(c => c.CreateBackupAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateBackupAsync_NormalizesModeAndCompressionCase()
+    {
+        _client.Setup(c => c.CreateBackupAsync("pve1", 100, "nas", "snapshot", "zstd", null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProxmoxBackupOperationResponse("UPID:pve1:1234:vzdump:100:root@pam:"));
+
+        var result = Json(await _tools.CreateBackupAsync("home", "pve1", 100, "nas", "SNAPSHOT", "Zstd"));
+
+        result.GetProperty("task").GetString().Should().StartWith("UPID:");
+        _client.Verify(c => c.CreateBackupAsync("pve1", 100, "nas", "snapshot", "zstd", null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // -- Error propagation -------------------------------------------------
 
     [Fact]

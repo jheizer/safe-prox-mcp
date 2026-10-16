@@ -46,6 +46,7 @@ public interface IProxmoxClient : IDisposable
     Task<ProxmoxSnapshotListResponse> GetContainerSnapshotsAsync(string node, int vmId, CancellationToken ct = default);
     Task<ProxmoxSnapshotOperationResponse> CreateVmSnapshotAsync(string node, int vmId, string name, string? description = null, CancellationToken ct = default);
     Task<ProxmoxSnapshotOperationResponse> CreateContainerSnapshotAsync(string node, int vmId, string name, string? description = null, CancellationToken ct = default);
+    Task<ProxmoxBackupOperationResponse> CreateBackupAsync(string node, int vmId, string storage, string? mode = null, string? compress = null, string? notes = null, CancellationToken ct = default);
 }
 
 public class ProxmoxApiClient : IProxmoxClient
@@ -205,6 +206,25 @@ public class ProxmoxApiClient : IProxmoxClient
     public Task<ProxmoxSnapshotOperationResponse> CreateContainerSnapshotAsync(string node, int vmId, string name, string? description = null, CancellationToken ct = default)
         => PostAsync<ProxmoxSnapshotOperationResponse>($"nodes/{Escape(node)}/lxc/{vmId}/snapshot", name, description, ct);
 
+    // -- Backups ---------------------------------------------------------
+    // vzdump is node-level and infers the guest type from the vmid, so the same
+    // endpoint backs up both qemu and lxc guests.
+    public Task<ProxmoxBackupOperationResponse> CreateBackupAsync(
+        string node, int vmId, string storage, string? mode = null, string? compress = null, string? notes = null,
+        CancellationToken ct = default)
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["vmid"] = vmId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["storage"] = storage
+        };
+        if (!string.IsNullOrEmpty(mode)) form["mode"] = mode;
+        if (!string.IsNullOrEmpty(compress)) form["compress"] = compress;
+        if (!string.IsNullOrEmpty(notes)) form["notes"] = notes;
+
+        return PostFormAsync<ProxmoxBackupOperationResponse>($"nodes/{Escape(node)}/vzdump", form, ct);
+    }
+
     // -- Plumbing ------------------------------------------------------
     private static string Escape(string value) => Uri.EscapeDataString(value);
 
@@ -230,20 +250,23 @@ public class ProxmoxApiClient : IProxmoxClient
         return await SendAsync<T>(request, path, ct).ConfigureAwait(false);
     }
 
-    private async Task<T> PostAsync<T>(string path, string name, string? description, CancellationToken ct)
+    private Task<T> PostAsync<T>(string path, string name, string? description, CancellationToken ct)
+        => PostFormAsync<T>(path, new Dictionary<string, string>
+        {
+            // The new snapshot name must be sent as `snapname`: PVE's schema rejects
+            // `snapshot` outright ("property is not defined in schema") and reports
+            // `snapname` as required.
+            ["snapname"] = name,
+            ["description"] = description ?? string.Empty
+        }, ct);
+
+    private async Task<T> PostFormAsync<T>(string path, Dictionary<string, string> form, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path)
         {
             // Proxmox accepts form-encoded parameters; JSON bodies are rejected by
             // several endpoints, so this is the only parameter encoding used.
-            // The new snapshot name must be sent as `snapname`: PVE's schema rejects
-            // `snapshot` outright ("property is not defined in schema") and reports
-            // `snapname` as required.
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["snapname"] = name,
-                ["description"] = description ?? string.Empty
-            })
+            Content = new FormUrlEncodedContent(form)
         };
         return await SendAsync<T>(request, path, ct).ConfigureAwait(false);
     }

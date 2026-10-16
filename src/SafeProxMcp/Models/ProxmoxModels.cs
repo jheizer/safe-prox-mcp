@@ -480,6 +480,10 @@ public record ProxmoxSnapshotInfo(
 
 public record ProxmoxSnapshotOperationResponse(string? Data);
 
+// -- Backups ---------------------------------------------------------
+// POST /nodes/{node}/vzdump answers with the UPID string of the queued task.
+public record ProxmoxBackupOperationResponse(string? Data);
+
 // -- Configuration ----------------------------------------------------
 public class ProxmoxClusterConfig
 {

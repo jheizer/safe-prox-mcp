@@ -493,7 +493,7 @@ public class ProxmoxApiClientTests
         result.Data[0].Name.Should().Be("ct-backup");
     }
 
-    // -- Snapshot creation (the only write the client exposes) ----------
+    // -- Snapshot creation ----------------------------------------------
 
     [Fact]
     public async Task CreateVmSnapshotAsync_PostsFormEncodedSnapshotName()
@@ -527,6 +527,49 @@ public class ProxmoxApiClientTests
 
         handler.LastRequestBody.Should().Contain("snapname=ct-snap");
         handler.LastRequestBody.Should().Contain("description=");
+    }
+
+    // -- Backup creation -------------------------------------------------
+
+    [Fact]
+    public async Task CreateBackupAsync_PostsFormEncodedVzdumpParameters()
+    {
+        var handler = new TestHttpHandler().Add(@"^/api2/json/nodes/pve1/vzdump$",
+            """
+            {"data":"UPID:pve1:00001234:00ABCD:65012345:vzdump:100:root@pam:"}
+            """);
+        using var client = Client(handler);
+
+        var result = await client.CreateBackupAsync("pve1", 100, "nas", "snapshot", "zstd", "pre upgrade backup");
+
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
+        handler.LastRequest!.Content!.Headers.ContentType!.MediaType
+            .Should().Be("application/x-www-form-urlencoded");
+        handler.LastRequestBody.Should().Contain("vmid=100");
+        handler.LastRequestBody.Should().Contain("storage=nas");
+        handler.LastRequestBody.Should().Contain("mode=snapshot");
+        handler.LastRequestBody.Should().Contain("compress=zstd");
+        handler.LastRequestBody.Should().Contain("notes=pre+upgrade+backup");
+        result.Data.Should().StartWith("UPID:");
+    }
+
+    [Fact]
+    public async Task CreateBackupAsync_OmitsOptionalParametersWhenNull()
+    {
+        var handler = new TestHttpHandler().Add(@"^/api2/json/nodes/pve1/vzdump$",
+            """
+            {"data":"UPID:pve1:00001234:00ABCD:65012345:vzdump:200:root@pam:"}
+            """);
+        using var client = Client(handler);
+
+        var result = await client.CreateBackupAsync("pve1", 200, "local");
+
+        handler.LastRequestBody.Should().Contain("vmid=200");
+        handler.LastRequestBody.Should().Contain("storage=local");
+        handler.LastRequestBody.Should().NotContain("mode=");
+        handler.LastRequestBody.Should().NotContain("compress=");
+        handler.LastRequestBody.Should().NotContain("notes=");
+        result.Data.Should().StartWith("UPID:");
     }
 
     // -- Error handling --------------------------------------------------

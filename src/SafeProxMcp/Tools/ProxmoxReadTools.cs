@@ -9,6 +9,8 @@ public class ProxmoxReadTools
 {
     private const int MaxSyslogLines = 1000;
     private const int DefaultSyslogLines = 200;
+    private static readonly string[] BackupModes = ["stop", "snapshot", "suspend"];
+    private static readonly string[] BackupCompressions = ["zstd", "gzip", "lzo", "bzip2", "none"];
 
     private readonly IMultiClusterProxmoxClient _multi;
 
@@ -564,6 +566,27 @@ public class ProxmoxReadTools
         return new { task = result.Data };
     }
 
+    // -- Backups --------------------------------------------------------
+    [McpServerTool, Description("Create a new backup (vzdump archive) of one VM or LXC container on a node. This changes cluster state: it writes a new backup file to the storage you name. Works for VMs and containers alike - vmId comes from lookup_all_vms_and_containers either way. storage is required and must be a storage that accepts backups (see get_storage). The backup runs asynchronously: the tool returns the Proxmox task id (UPID) as soon as the job is queued, not when the archive is finished.")]
+    public async Task<object> CreateBackupAsync(
+        [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
+        [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
+        [Description("VMID of the VM or container to back up, from lookup_all_vms_and_containers.")] int vmId,
+        [Description("Backup storage to write the archive to, as listed by get_storage.")] string storage,
+        [Description("Backup mode: 'stop' powers the guest off first, 'snapshot' backs it up live, 'suspend' pauses it during the backup. Omit for Proxmox's default (snapshot).")] string? mode = null,
+        [Description("Archive compression: zstd, gzip, lzo, bzip2 or none. Omit for Proxmox's default.")] string? compress = null,
+        [Description("Optional note stored with the backup archive.")] string? notes = null)
+    {
+        var result = await Client(cluster).CreateBackupAsync(
+            Require(node, nameof(node)),
+            RequireVmId(vmId),
+            Require(storage, nameof(storage)),
+            NormalizeChoice(mode, BackupModes, nameof(mode)),
+            NormalizeChoice(compress, BackupCompressions, nameof(compress)),
+            string.IsNullOrWhiteSpace(notes) ? null : notes);
+        return new { task = result.Data };
+    }
+
     // -- Helpers --------------------------------------------------------
     private IProxmoxClient Client(string cluster) => _multi.GetClient(cluster);
 
@@ -617,5 +640,15 @@ public class ProxmoxReadTools
         if (vmId <= 0)
             throw new ArgumentException("vmId must be a positive Proxmox VMID.", nameof(vmId));
         return vmId;
+    }
+
+    private static string? NormalizeChoice(string? value, string[] allowed, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        var match = Array.Find(allowed, a => string.Equals(a, value, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            throw new ArgumentException($"{parameterName} must be one of: {string.Join(", ", allowed)}.", parameterName);
+        return match;
     }
 }

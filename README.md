@@ -3,8 +3,8 @@
 Non-destructive bridge between AI and Proxmox Virtual Environment clusters.
 
 An MCP (Model Context Protocol) server over HTTP that exposes Proxmox VE state to
-MCP clients. 21 of the 23 tools are pure reads. The only tools that modify anything are
-`create_vm_snapshot` and `create_container_snapshot`.
+MCP clients. 22 of the 24 tools are pure reads. The only tools that modify anything are
+`create_vm_snapshot`, `create_container_snapshot` and `create_backup`.
 
 ![Screenshot of AI taking snapshot](assets/snapshot.png)
 
@@ -12,7 +12,7 @@ MCP clients. 21 of the 23 tools are pure reads. The only tools that modify anyth
 
 - Docker
 - A Proxmox API token: `user@realm!name=uuid`.  The server never sends write requests except
-  the two snapshot tools.
+  the snapshot and backup tools.
 
 ## Setup
 
@@ -106,6 +106,8 @@ Virtual machines: `get_vms`, `get_vm_status`, `get_vm_config`, `get_vm_snapshots
 Containers: `get_containers`, `get_container_status`, `get_container_config`,
 `get_container_snapshots`, `create_container_snapshot`
 
+Backups: `create_backup` (VMs and containers alike)
+
 Infrastructure: `get_storage`, `get_networks`, `get_disks`, `get_users`, `get_groups`
 
 ### Example: snapshot a VM named `opnsense`
@@ -135,3 +137,26 @@ returns the Proxmox task id, e.g.
 guest use `create_container_snapshot`. Snapshot names must satisfy Proxmox's naming
 rules: alphanumeric first character, then letters, digits, `_`, `.` or `-`, at most
 64 characters.
+
+### Example: back up VM 100 to storage `nas`
+
+`create_backup` takes the same `cluster`/`node`/`vmId` identifiers as the snapshot tools
+and works for VMs and containers alike:
+
+```json
+{
+  "cluster": "home",
+  "node": "pve",
+  "vmId": 100,
+  "storage": "nas",
+  "mode": "snapshot",
+  "compress": "zstd",
+  "notes": "pre-upgrade"
+}
+```
+
+`storage` is required (a storage that accepts backups, as listed by `get_storage`);
+`mode` (`stop`, `snapshot` or `suspend`), `compress` (`zstd`, `gzip`, `lzo`, `bzip2`,
+`none`) and `notes` are optional. The backup runs asynchronously: the tool returns the
+queued task id, e.g. `{"task":"UPID:pve1:1234:vzdump:100:root@pam:"}`, not a finished
+archive. Only creating backups is exposed — no restore, list or delete.
