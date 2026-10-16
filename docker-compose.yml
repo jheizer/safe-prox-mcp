@@ -9,5 +9,7 @@ services:
       - ./clusters.json:/app/clusters.json:ro
     environment:
       - MCP_SERVER_API_KEY=ChangeThisToYourSecureSecretKey
+      # Uncomment to unregister the snapshot and backup tools entirely (read-only server):
+      # - SAFEPROX_DISABLE_WRITE_TOOLS=1
     ports:
       - "8080:8080"

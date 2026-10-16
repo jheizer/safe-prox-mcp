@@ -4,6 +4,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using SafeProxMcp.Services;
+using SafeProxMcp.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,11 @@ foreach (var cluster in clusters)
     Console.WriteLine($"  cluster '{cluster.Id}' -> {cluster.Url}");
 }
 
+var writeToolsEnabled = ProxmoxWriteTools.EnabledFromEnvironment();
+Console.WriteLine(writeToolsEnabled
+    ? "  write tools: enabled (create_vm_snapshot, create_container_snapshot, create_backup)"
+    : $"  write tools: DISABLED by {ProxmoxWriteTools.DisableEnvironmentVariable}");
+
 var mcpApiKey = Environment.GetEnvironmentVariable("MCP_SERVER_API_KEY");
 
 builder.Services.AddSingleton<IMultiClusterProxmoxClient>(_ => new ProxmoxMultiClusterClient(clusters));
@@ -23,9 +29,11 @@ var toolLogger = LoggerFactory.Create(logging =>
     logging.AddConfiguration(builder.Configuration.GetSection("Logging")).AddConsole())
     .CreateLogger("SafeProxMcp.Tools");
 
-builder.Services.AddMcpServer()
-    .WithHttpTransport()
-    .WithToolsFromAssembly()
+var mcpServer = builder.Services.AddMcpServer()
+    .WithHttpTransport();
+if (writeToolsEnabled)
+    mcpServer.WithTools<ProxmoxWriteTools>();
+mcpServer.WithTools<ProxmoxReadTools>()
     .WithRequestFilters(filters =>
         filters.AddCallToolFilter(next => async (context, cancellationToken) =>
         {

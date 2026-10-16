@@ -4,7 +4,8 @@ Non-destructive bridge between AI and Proxmox Virtual Environment clusters.
 
 An MCP (Model Context Protocol) server over HTTP that exposes Proxmox VE state to
 MCP clients. 22 of the 24 tools are pure reads. The only tools that modify anything are
-`create_vm_snapshot`, `create_container_snapshot` and `create_backup`.
+`create_vm_snapshot`, `create_container_snapshot` and `create_backup`; set
+`SAFEPROX_DISABLE_WRITE_TOOLS=1` to remove those three entirely (see [Write tools](#write-tools)).
 
 ![Screenshot of AI taking snapshot](assets/snapshot.png)
 
@@ -12,7 +13,7 @@ MCP clients. 22 of the 24 tools are pure reads. The only tools that modify anyth
 
 - Docker
 - A Proxmox API token: `user@realm!name=uuid`.  The server never sends write requests except
-  the snapshot and backup tools.
+  the snapshot and backup tools - and never at all when `SAFEPROX_DISABLE_WRITE_TOOLS=1`.
 
 ## Setup
 
@@ -85,6 +86,15 @@ private network in that case.
   }
 }
 ```
+
+## Write tools
+
+`create_vm_snapshot`, `create_container_snapshot` and `create_backup` are the only tools
+that change cluster state. Set `SAFEPROX_DISABLE_WRITE_TOOLS=1` (or `true` or `yes`,
+case-insensitive) in the environment to unregister them at startup: `tools/list` then
+shows only the 21 read tools, the server never sends a write request, and startup logs
+`write tools: DISABLED`. Any other value (including unset or empty) keeps them enabled.
+The variable is read once at startup; changing it requires a restart.
 
 ## Tools
 
