@@ -92,6 +92,8 @@ public class ClusterConfigLoaderTests : IDisposable
     [InlineData("""[{"id":"home","url":"https://pve:8006"}]""", "*must have a 'token'*")]
     [InlineData("""[{"id":"home","url":"https://a:8006","token":"t=1"},{"id":"HOME","url":"https://b:8006","token":"t=1"}]""",
         "*duplicate cluster id 'HOME'*")]
+    [InlineData("""[{"id":"home","url":"https://a:8006","token":"t=1"},null]""", "*contains a null entry*")]
+    [InlineData("""[null]""", "*contains a null entry*")]
     public void Load_RejectsInvalidConfiguration(string json, string expectedMessage)
     {
         var path = WriteConfig(json);

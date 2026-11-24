@@ -25,15 +25,19 @@ public class ProxmoxWriteTools
         _multi = multi ?? throw new ArgumentNullException(nameof(multi));
     }
 
-    /// <summary>False only when the variable is 1, true or yes (case-insensitive);
-    /// unset, empty or any other value leaves the write tools enabled.</summary>
+    /// <summary>The flag keeps write tools enabled only when it is unset/empty or explicitly
+    /// falsy (0, false, no, off — case-insensitive). Any other value, including a typo of a
+    /// disable value, disables the write tools: the fail-safe direction for a bridge whose
+    /// promise is non-destructive.</summary>
     public static bool EnabledFromEnvironment()
     {
-        var value = Environment.GetEnvironmentVariable(DisableEnvironmentVariable);
-        return value is null
-            || !(value.Equals("1", StringComparison.OrdinalIgnoreCase)
-              || value.Equals("true", StringComparison.OrdinalIgnoreCase)
-              || value.Equals("yes", StringComparison.OrdinalIgnoreCase));
+        var value = Environment.GetEnvironmentVariable(DisableEnvironmentVariable)?.Trim();
+        if (string.IsNullOrEmpty(value))
+            return true;
+        return value.Equals("0", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("false", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("no", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("off", StringComparison.OrdinalIgnoreCase);
     }
 
     private IProxmoxClient Client(string cluster) => _multi.GetClient(cluster);
@@ -48,7 +52,7 @@ public class ProxmoxWriteTools
         [Description("Optional snapshot description.")] string? description = null)
     {
         var result = await Client(cluster).CreateVmSnapshotAsync(
-            Require(node, nameof(node)), RequireVmId(vmId), Require(name, nameof(name)), description);
+            RequireNode(node), RequireVmId(vmId), RequireSnapshotName(name), description);
         return new { task = result.Data };
     }
 
@@ -61,7 +65,7 @@ public class ProxmoxWriteTools
         [Description("Optional snapshot description.")] string? description = null)
     {
         var result = await Client(cluster).CreateContainerSnapshotAsync(
-            Require(node, nameof(node)), RequireVmId(vmId), Require(name, nameof(name)), description);
+            RequireNode(node), RequireVmId(vmId), RequireSnapshotName(name), description);
         return new { task = result.Data };
     }
 
@@ -77,7 +81,7 @@ public class ProxmoxWriteTools
         [Description("Optional note stored with the backup archive.")] string? notes = null)
     {
         var result = await Client(cluster).CreateBackupAsync(
-            Require(node, nameof(node)),
+            RequireNode(node),
             RequireVmId(vmId),
             Require(storage, nameof(storage)),
             NormalizeChoice(mode, BackupModes, nameof(mode)),

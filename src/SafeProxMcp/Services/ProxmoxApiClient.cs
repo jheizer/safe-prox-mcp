@@ -53,6 +53,11 @@ public class ProxmoxApiClient : IProxmoxClient
 {
     private readonly HttpClient _http;
     private readonly JsonSerializerOptions _jsonOptions;
+
+    // Setting this to 1/true/yes restores standard TLS certificate validation.
+    // Unset or any other value keeps the trust-all default described in CreateHandler.
+    public const string TlsVerifyEnvironmentVariable = "SAFEPROX_TLS_VERIFY";
+
     // PVE API tokens are always "user@realm!name=uuid".
     private static readonly System.Text.RegularExpressions.Regex ApiTokenPattern =
         new(@"^[^!@]+@[^!@]+![^=]+=.*$", System.Text.RegularExpressions.RegexOptions.Compiled);
@@ -115,14 +120,29 @@ public class ProxmoxApiClient : IProxmoxClient
         return new Uri(root + "/");
     }
 
+    /// <summary>True only when SAFEPROX_TLS_VERIFY is 1, true or yes (case-insensitive);
+    /// unset, empty or any other value keeps the trust-all default.</summary>
+    public static bool TlsVerifyEnabledFromEnvironment()
+    {
+        var value = Environment.GetEnvironmentVariable(TlsVerifyEnvironmentVariable)?.Trim();
+        return value is not null
+            && (value.Equals("1", StringComparison.OrdinalIgnoreCase)
+              || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+              || value.Equals("yes", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static HttpMessageHandler CreateHandler()
     {
         // Proxmox ships a self-signed certificate by default, so the API token is
-        // the access control here, not the certificate.
-        return new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-        };
+        // the access control here, not the certificate. The cost of trusting every
+        // certificate is that anyone on the network path can impersonate the cluster
+        // and harvest the Authorization header. Deployments whose clusters have
+        // certificates chaining to the container's trust store should set
+        // SAFEPROX_TLS_VERIFY=1 to enforce validation.
+        var handler = new HttpClientHandler();
+        if (!TlsVerifyEnabledFromEnvironment())
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        return handler;
     }
 
     // -- Nodes ---------------------------------------------------------

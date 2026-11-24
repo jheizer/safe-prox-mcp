@@ -723,4 +723,52 @@ public class ProxmoxApiClientTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
+
+    // -- Defense in depth ----------------------------------------------------
+
+    [Fact]
+    public async Task NodeArgumentIsPercentEncodedSoSlashesCannotChangeTheRoute()
+    {
+        var handler = new TestHttpHandler().Add(@"^/api2/json/nodes/pve%2Fevil/qemu$", "{\"data\":[]}");
+        using var client = Client(handler);
+
+        await client.GetVmsAsync("pve/evil");
+
+        handler.LastRequest!.RequestUri!.AbsolutePath.Should().Be("/api2/json/nodes/pve%2Fevil/qemu");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("0")]
+    [InlineData("maybe")]
+    public void TlsVerify_IsOffUnlessExplicitlyEnabled(string? value)
+    {
+        WithTlsVerifyEnvironmentVariable(value,
+            () => ProxmoxApiClient.TlsVerifyEnabledFromEnvironment().Should().BeFalse());
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("true")]
+    [InlineData("YES")]
+    public void TlsVerify_IsOnForExplicitEnableValues(string value)
+    {
+        WithTlsVerifyEnvironmentVariable(value,
+            () => ProxmoxApiClient.TlsVerifyEnabledFromEnvironment().Should().BeTrue());
+    }
+
+    private static void WithTlsVerifyEnvironmentVariable(string? value, Action assertion)
+    {
+        var original = Environment.GetEnvironmentVariable(ProxmoxApiClient.TlsVerifyEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(ProxmoxApiClient.TlsVerifyEnvironmentVariable, value);
+            assertion();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(ProxmoxApiClient.TlsVerifyEnvironmentVariable, original);
+        }
+    }
 }

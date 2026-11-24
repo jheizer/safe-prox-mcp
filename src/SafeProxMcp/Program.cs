@@ -21,7 +21,13 @@ Console.WriteLine(writeToolsEnabled
     ? "  write tools: enabled (create_vm_snapshot, create_container_snapshot, create_backup)"
     : $"  write tools: DISABLED by {ProxmoxWriteTools.DisableEnvironmentVariable}");
 
+Console.WriteLine(ProxmoxApiClient.TlsVerifyEnabledFromEnvironment()
+    ? $"  TLS certificate verification: enabled ({ProxmoxApiClient.TlsVerifyEnvironmentVariable})"
+    : $"  TLS certificate verification: DISABLED — every certificate is trusted by default; set {ProxmoxApiClient.TlsVerifyEnvironmentVariable}=1 when clusters have valid certificates");
+
 var mcpApiKey = Environment.GetEnvironmentVariable("MCP_SERVER_API_KEY");
+if (string.IsNullOrEmpty(mcpApiKey))
+    Console.WriteLine("  WARNING: MCP_SERVER_API_KEY is not set — /mcp is UNAUTHENTICATED. Keep the server on a private network.");
 
 builder.Services.AddSingleton<IMultiClusterProxmoxClient>(_ => new ProxmoxMultiClusterClient(clusters));
 
