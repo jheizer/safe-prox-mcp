@@ -164,6 +164,31 @@ public class ProxmoxReadToolsTests
     }
 
     [Theory]
+    [InlineData("pve/evil")]
+    [InlineData("pve/../access")]
+    [InlineData("..")]
+    [InlineData(".hidden")]
+    [InlineData("pve evil")]
+    public async Task NodeNameThatCouldEscapeTheApiPath_IsRejected(string node)
+    {
+        var act = () => _tools.GetVmsAsync("home", node);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("node must be a node name*");
+        _client.Verify(c => c.GetVmsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OptionalStorageNode_IsValidatedWhenProvided()
+    {
+        var act = () => _tools.GetStorageAsync("home", "pve%2Fevil");
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("node must be a node name*");
+        _client.Verify(c => c.GetStorageAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-12)]
     public async Task NonPositiveVmId_IsRejected(int vmId)

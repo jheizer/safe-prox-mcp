@@ -77,7 +77,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var status = await Client(cluster).GetNodeStatusAsync(Require(node, nameof(node)));
+        var status = await Client(cluster).GetNodeStatusAsync(RequireNode(node));
         return new
         {
             pveVersion = status.PveVersion,
@@ -175,7 +175,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var response = await Client(cluster).GetVmsAsync(Require(node, nameof(node)));
+        var response = await Client(cluster).GetVmsAsync(RequireNode(node));
         return response.Data.Select(vm => new
         {
             vmid = vm.VmId,
@@ -205,7 +205,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric VM id) of a type 'vm' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var status = await Client(cluster).GetVmStatusAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var status = await Client(cluster).GetVmStatusAsync(RequireNode(node), RequireVmId(vmId));
         return ProjectStatus(status);
     }
 
@@ -215,7 +215,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric VM id) of a type 'vm' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var config = await Client(cluster).GetVmConfigAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var config = await Client(cluster).GetVmConfigAsync(RequireNode(node), RequireVmId(vmId));
         return new
         {
             name = config.Name,
@@ -267,7 +267,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var response = await Client(cluster).GetContainersAsync(Require(node, nameof(node)));
+        var response = await Client(cluster).GetContainersAsync(RequireNode(node));
         return response.Data.Select(c => new
         {
             vmid = c.VmId,
@@ -300,7 +300,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric container id) of a type 'container' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var status = await Client(cluster).GetContainerStatusAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var status = await Client(cluster).GetContainerStatusAsync(RequireNode(node), RequireVmId(vmId));
         return ProjectStatus(status);
     }
 
@@ -310,7 +310,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric container id) of a type 'container' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var config = await Client(cluster).GetContainerConfigAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var config = await Client(cluster).GetContainerConfigAsync(RequireNode(node), RequireVmId(vmId));
         return new
         {
             hostname = config.Hostname,
@@ -349,7 +349,8 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Optional node name; when given, per-node usage numbers are included.")] string? node = null)
     {
-        var response = await Client(cluster).GetStorageAsync(node);
+        var response = await Client(cluster).GetStorageAsync(
+            string.IsNullOrWhiteSpace(node) ? null : RequireNode(node));
         return response.Data.Select(s => new
         {
             storage = s.Storage,
@@ -382,7 +383,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var response = await Client(cluster).GetNetworksAsync(Require(node, nameof(node)));
+        var response = await Client(cluster).GetNetworksAsync(RequireNode(node));
         return response.Data.Select(n => new
         {
             iface = n.Iface,
@@ -454,7 +455,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var response = await Client(cluster).GetDisksAsync(Require(node, nameof(node)));
+        var response = await Client(cluster).GetDisksAsync(RequireNode(node));
         return response.Data.Select(d => new
         {
             devname = d.DevName,
@@ -487,7 +488,7 @@ public class ProxmoxReadTools
         [Description("Cluster id, exactly as returned by lookup_all_vms_and_containers.")] string cluster,
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node)
     {
-        var response = await Client(cluster).GetVersionAsync(Require(node, nameof(node)));
+        var response = await Client(cluster).GetVersionAsync(RequireNode(node));
         return new
         {
             version = response.Data.Version,
@@ -508,7 +509,7 @@ public class ProxmoxReadTools
         if (limit < 1 || limit > MaxSyslogLines)
             throw new ArgumentException($"limit must be between 1 and {MaxSyslogLines}.", nameof(limit));
 
-        var response = await Client(cluster).GetNodeSyslogAsync(Require(node, nameof(node)), start, limit);
+        var response = await Client(cluster).GetNodeSyslogAsync(RequireNode(node), start, limit);
         return new
         {
             start,
@@ -525,7 +526,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric VM id) of a type 'vm' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var response = await Client(cluster).GetVmSnapshotsAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var response = await Client(cluster).GetVmSnapshotsAsync(RequireNode(node), RequireVmId(vmId));
         return ProjectSnapshots(response.Data);
     }
 
@@ -535,7 +536,7 @@ public class ProxmoxReadTools
         [Description("Node name, exactly as returned by lookup_all_vms_and_containers.")] string node,
         [Description("VMID (numeric container id) of a type 'container' entry from lookup_all_vms_and_containers.")] int vmId)
     {
-        var response = await Client(cluster).GetContainerSnapshotsAsync(Require(node, nameof(node)), RequireVmId(vmId));
+        var response = await Client(cluster).GetContainerSnapshotsAsync(RequireNode(node), RequireVmId(vmId));
         return ProjectSnapshots(response.Data);
     }
 

@@ -54,6 +54,9 @@ public static class ClusterConfigLoader
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var config in configs)
         {
+            if (config is null)
+                throw new InvalidOperationException(
+                    $"{source}: the cluster list contains a null entry; each entry must be a cluster object with 'id', 'url' and 'token'.");
             if (string.IsNullOrWhiteSpace(config.Id))
                 throw new InvalidOperationException($"{source}: each cluster must have an 'id'.");
             if (!seen.Add(config.Id))

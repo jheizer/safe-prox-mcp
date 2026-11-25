@@ -3,7 +3,7 @@
 Non-destructive bridge between AI and Proxmox Virtual Environment clusters.
 
 An MCP (Model Context Protocol) server over HTTP that exposes Proxmox VE state to
-MCP clients. 22 of the 24 tools are pure reads. The only tools that modify anything are
+MCP clients. 21 of the 24 tools are pure reads. The only tools that modify anything are
 `create_vm_snapshot`, `create_container_snapshot` and `create_backup`; set
 `SAFEPROX_DISABLE_WRITE_TOOLS=1` to remove those three entirely (see [Write tools](#write-tools)).
 
@@ -72,7 +72,19 @@ the server listens on port 8080.
 
 Set `MCP_SERVER_API_KEY` to require `Authorization: Bearer <key>` on every request
 except `/health`. Leaving it empty disables authentication — keep the server on a
-private network in that case.
+private network in that case (startup logs a warning when the key is unset).
+
+## TLS certificate verification
+
+Nothing to configure for the common case: verification is **disabled by default**,
+because Proxmox ships a self-signed certificate and the API token is the access
+control. The server works zero-config out of the box.
+
+Set `SAFEPROX_TLS_VERIFY=1` (also `true`/`yes`) to **enable** strict verification
+when your clusters have certificates that validate against the container's trust
+store. With verification disabled, anyone on the network path could impersonate a
+cluster and capture the token — enable strict verification wherever trusted
+certificates are available. Startup logs the mode either way.
 
 ### MCP client example
 
@@ -93,8 +105,10 @@ private network in that case.
 that change cluster state. Set `SAFEPROX_DISABLE_WRITE_TOOLS=1` (or `true` or `yes`,
 case-insensitive) in the environment to unregister them at startup: `tools/list` then
 shows only the 21 read tools, the server never sends a write request, and startup logs
-`write tools: DISABLED`. Any other value (including unset or empty) keeps them enabled.
-The variable is read once at startup; changing it requires a restart.
+`write tools: DISABLED`. The flag fails closed: any value other than unset/empty or an
+explicit `0`/`false`/`no`/`off` disables the write tools, so a typo of a disable value
+never silently leaves mutation enabled. The variable is read once at startup; changing
+it requires a restart.
 
 ## Tools
 
@@ -146,7 +160,9 @@ returns the Proxmox task id, e.g.
 `get_vm_snapshots` — `{"cluster": "home", "node": "pve", "vmId": 100}`. For an LXC
 guest use `create_container_snapshot`. Snapshot names must satisfy Proxmox's naming
 rules: alphanumeric first character, then letters, digits, `_`, `.` or `-`, at most
-64 characters.
+64 characters. The server enforces these rules (and node-name rules: letters, digits,
+`.`, `_`, `-`) before any request is sent, rejecting arguments that could otherwise be
+rejected by Proxmox or manipulate the API path.
 
 ### Example: back up VM 100 to storage `nas`
 

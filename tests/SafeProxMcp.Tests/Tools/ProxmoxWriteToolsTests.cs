@@ -62,6 +62,58 @@ public class ProxmoxWriteToolsTests
         result.GetProperty("task").GetString().Should().StartWith("UPID:");
     }
 
+    [Theory]
+    [InlineData("bad name")]
+    [InlineData(".hidden")]
+    [InlineData("snap/name")]
+    [InlineData("snap;touch")]
+    public async Task CreateVmSnapshotAsync_RejectsNamesOutsideProxmoxRules(string name)
+    {
+        var act = () => _tools.CreateVmSnapshotAsync("home", "pve1", 100, name);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("name must start with a letter or digit*");
+        _client.Verify(c => c.CreateVmSnapshotAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateVmSnapshotAsync_RejectsNameOver64Characters()
+    {
+        var act = () => _tools.CreateVmSnapshotAsync("home", "pve1", 100, new string('a', 65));
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*at most 64 characters*");
+    }
+
+    [Theory]
+    [InlineData("pve/evil")]
+    [InlineData("..")]
+    [InlineData("pve evil")]
+    [InlineData("pve%2Fx")]
+    public async Task CreateVmSnapshotAsync_RejectsNodesThatCouldEscapeTheApiPath(string node)
+    {
+        var act = () => _tools.CreateVmSnapshotAsync("home", node, 100, "snap");
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("node must be a node name*");
+        _client.Verify(c => c.CreateVmSnapshotAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("pve/../access")]
+    [InlineData(".ssh")]
+    public async Task CreateBackupAsync_RejectsNodesThatCouldEscapeTheApiPath(string node)
+    {
+        var act = () => _tools.CreateBackupAsync("home", node, 100, "nas");
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("node must be a node name*");
+        _client.Verify(c => c.CreateBackupAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // -- Backups ----------------------------------------------------------
 
     [Fact]
@@ -128,7 +180,9 @@ public class ProxmoxWriteToolsTests
     [InlineData("true")]
     [InlineData("TRUE")]
     [InlineData("yes")]
-    public void WriteTools_AreDisabledByExplicitDisableValues(string value)
+    [InlineData("maybe")]
+    [InlineData("diabled")] // a typo of a disable value must fail closed, not open
+    public void WriteTools_AreDisabledByAnythingThatIsNotExplicitlyFalsy(string value)
     {
         WithEnvironmentVariable(value,
             () => ProxmoxWriteTools.EnabledFromEnvironment().Should().BeFalse());
@@ -139,8 +193,9 @@ public class ProxmoxWriteToolsTests
     [InlineData("")]
     [InlineData("0")]
     [InlineData("false")]
-    [InlineData("maybe")]
-    public void WriteTools_StayEnabledUnlessExplicitlyDisabled(string? value)
+    [InlineData("no")]
+    [InlineData("off")]
+    public void WriteTools_StayEnabledOnlyForEmptyOrExplicitlyFalsyValues(string? value)
     {
         WithEnvironmentVariable(value,
             () => ProxmoxWriteTools.EnabledFromEnvironment().Should().BeTrue());
