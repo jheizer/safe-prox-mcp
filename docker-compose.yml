@@ -11,7 +11,8 @@ services:
       - MCP_SERVER_API_KEY=ChangeThisToYourSecureSecretKey
       # Uncomment to unregister the snapshot and backup tools entirely (read-only server):
       # - SAFEPROX_DISABLE_WRITE_TOOLS=1
-      # Uncomment to enforce TLS certificate validation (clusters with trusted certificates):
+      # No setting needed for self-signed certificates (default, zero-config).
+      # Uncomment only when your clusters have trusted certificates (enables strict validation):
       # - SAFEPROX_TLS_VERIFY=1
     ports:
       - "8080:8080"

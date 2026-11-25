@@ -76,12 +76,15 @@ private network in that case (startup logs a warning when the key is unset).
 
 ## TLS certificate verification
 
-Proxmox ships a self-signed certificate by default, so the server trusts any
-certificate and relies on the API token as the access control. That default lets
-anything on the network path impersonate a cluster and capture the token. If your
-clusters have certificates that validate against the container's trust store, set
-`SAFEPROX_TLS_VERIFY=1` (also `true`/`yes`) to enforce standard verification; startup
-logs the mode either way.
+Nothing to configure for the common case: verification is **disabled by default**,
+because Proxmox ships a self-signed certificate and the API token is the access
+control. The server works zero-config out of the box.
+
+Set `SAFEPROX_TLS_VERIFY=1` (also `true`/`yes`) to **enable** strict verification
+when your clusters have certificates that validate against the container's trust
+store. With verification disabled, anyone on the network path could impersonate a
+cluster and capture the token — enable strict verification wherever trusted
+certificates are available. Startup logs the mode either way.
 
 ### MCP client example
 

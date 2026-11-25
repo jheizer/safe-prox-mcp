@@ -23,7 +23,7 @@ Console.WriteLine(writeToolsEnabled
 
 Console.WriteLine(ProxmoxApiClient.TlsVerifyEnabledFromEnvironment()
     ? $"  TLS certificate verification: enabled ({ProxmoxApiClient.TlsVerifyEnvironmentVariable})"
-    : $"  TLS certificate verification: DISABLED — every certificate is trusted by default; set {ProxmoxApiClient.TlsVerifyEnvironmentVariable}=1 when clusters have valid certificates");
+    : $"  TLS certificate verification: disabled by default (Proxmox ships self-signed certificates; zero-config). Set {ProxmoxApiClient.TlsVerifyEnvironmentVariable}=1 when your clusters have trusted certificates");
 
 var mcpApiKey = Environment.GetEnvironmentVariable("MCP_SERVER_API_KEY");
 if (string.IsNullOrEmpty(mcpApiKey))
